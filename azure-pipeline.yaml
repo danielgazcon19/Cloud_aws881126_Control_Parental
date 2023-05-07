@@ -32,6 +32,9 @@ variables:
   cloudformation-template-s3: "$(System.DefaultWorkingDirectory)/DMS/cloudformation/template-s3.yaml"
   cloudformation-params-s3: "$(System.DefaultWorkingDirectory)/DMS/config/params-s3.json"
 
+  cloudformation-template-ec2: '$(System.DefaultWorkingDirectory)/cloudformation/template-ec2.yaml'
+  cloudformation-params-ec2: '$(System.DefaultWorkingDirectory)/config/params-ec2.json'
+
 
 stages:
 
@@ -50,7 +53,7 @@ stages:
     jobs:
     - template: validations.yaml@Template_Control-Parental_rules
       parameters:
-        resources: ['rds', 's3']
+        resources: ['rds', 's3', 'ec2']
 
   - stage: deploy_dev_rds
     dependsOn: [code_scan_iac_dev, linters]
@@ -80,6 +83,20 @@ stages:
         jobname: s3
         env: dev
 
+  - stage: deploy_dev_ec2
+    dependsOn: [code_scan_iac_dev, linters]
+    displayName: Deploy dev ec2
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-dev-ec2-stack
+        resource: ec2
+        library: aws881126-Control-Parental
+        account: Control-Parental-cuenta-implementacion-dev-aws
+        jobname: ec2
+        env: dev
+
   - stage: code_scan_iac_qa
     dependsOn: linters
     displayName: Code Scan IaC Qa
@@ -90,7 +107,7 @@ stages:
     jobs:
     - template: validations.yaml@Template_Control-Parental_rules
       parameters:
-        resources: ['rds', 's3']
+        resources: ['rds', 's3', 'ec2']
 
   - stage: deploy_qa_rds
     dependsOn: [code_scan_iac_qa, linters]
@@ -120,6 +137,19 @@ stages:
         jobname: s3
         env: qa
 
+  - stage: deploy_qa_ec2
+    dependsOn: [code_scan_iac_qa, linters]
+    displayName: Deploy qa ec2
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-qa-ec2-stack
+        resource: ec2
+        library: aws881126-Control-Parental
+        account: Control-Parental-cuenta-implementacion-qa-aws
+        jobname: ec2
+        env: qa
 
   - stage: code_scan_iac_pdn
     dependsOn: [deploy_qa_rds, deploy_qa_dms, deploy_qa_s3]
@@ -131,7 +161,7 @@ stages:
     jobs:
     - template: validations.yaml@Template_Control-Parental_rules
       parameters:
-        resources: ['rds', 's3']
+        resources: ['rds', 's3','ec2']
 
   - stage: deploy_pdn_rds
     condition: and(succeeded(), eq(variables['Build.SourceBranch'],'refs/heads/trunk'))
@@ -161,4 +191,19 @@ stages:
         library: aws881126-Control-Parental-DMS-pdn-ou-aws
         account: Control-Parental-cuenta-implementacion-pdn-aws
         jobname: s3
+        env: pdngit 
+
+  - stage: deploy_pdn_ec2
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'],'refs/heads/trunk'))
+    dependsOn: [code_scan_iac_pdn, linters]
+    displayName: Deploy pdn ec2
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-pdn-ec2-stack
+        resource: ec2
+        library: aws881126-Control-Parental-DMS-pdn-ou-aws
+        account: Control-Parental-cuenta-implementacion-pdn-aws
+        jobname: ec2
         env: pdngit 
