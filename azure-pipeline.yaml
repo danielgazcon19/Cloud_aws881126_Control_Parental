@@ -1,0 +1,164 @@
+resources:
+  repositories:
+    - repository: Cloud_aws881126_Control_Parental
+      type: git
+      ref: refs/heads/trunk
+      name: Cloud_aws881126_Control_Parental
+
+    - repository: Template
+      type: git
+      ref: refs/heads/trunk
+      name: Template
+
+trigger:
+  branches:
+    include:
+      - trunk
+
+variables:
+  application-code: 'aws881126'
+  project-name: 'Control_Parental'
+  cloudformation-stack-name: '$(application-code)-$(project-name)'
+
+  ### TAGS SEGURIDAD ###
+  tags-clas-info-seguridad-cid: "confidencialidad,integridad,disponibilidad"
+  ### tags-seguridad: confidencialidad,integridad,disponibilidad,dominio-informacion,datos-personales,cumplimiento ###
+  tags-seguridad: interna,sin impacto,sin impacto,no,no,no
+
+  ### CLOUDFORMATION ###
+  cloudformation-template-rds: "$(System.DefaultWorkingDirectory)/DMS/cloudformation/template-rds.yaml"
+  cloudformation-params-rds: "$(System.DefaultWorkingDirectory)/DMS/config/params-rds.json"
+
+  cloudformation-template-s3: "$(System.DefaultWorkingDirectory)/DMS/cloudformation/template-s3.yaml"
+  cloudformation-params-s3: "$(System.DefaultWorkingDirectory)/DMS/config/params-s3.json"
+
+
+stages:
+
+  - stage: linters
+    displayName: Validations Cloud
+    jobs:
+      - template: /Deployment/validations.yaml@Cloud_aw881126_despliegu
+
+  - stage: code_scan_iac_dev
+    dependsOn: linters
+    displayName: Code Scan IaC dev
+    variables:
+      - group: 'aws881126-Control-Parental'
+      - name: env
+        value: 'qa'
+    jobs:
+    - template: validations.yaml@Template_Control-Parental_rules
+      parameters:
+        resources: ['rds', 's3']
+
+  - stage: deploy_dev_rds
+    dependsOn: [code_scan_iac_dev, linters]
+    displayName: Deploy dev RDS
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-dev-rds-stack
+        resource: rds
+        library: aws881126-Control-Parental-DMS-dev-ou-aws
+        account: Control-Parental-cuenta-implementacion-dev-aws
+        jobname: rds
+        env: dev
+
+  - stage: deploy_dev_s3
+    dependsOn: [code_scan_iac_dev, linters]
+    displayName: Deploy dev S3
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-dev-s3-stack
+        resource: s3
+        library: aws881126-Control-Parental
+        account: Control-Parental-cuenta-implementacion-dev-aws
+        jobname: s3
+        env: dev
+
+  - stage: code_scan_iac_qa
+    dependsOn: linters
+    displayName: Code Scan IaC Qa
+    variables:
+      - group: 'aws881126-Control-Parental'
+      - name: env
+        value: 'qa'
+    jobs:
+    - template: validations.yaml@Template_Control-Parental_rules
+      parameters:
+        resources: ['rds', 's3']
+
+  - stage: deploy_qa_rds
+    dependsOn: [code_scan_iac_qa, linters]
+    displayName: Deploy qa RDS
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-qa-rds-stack
+        resource: rds
+        library: aws881126-Control-Parental
+        account: Control-Parental-cuenta-implementacion-qa-aws
+        jobname: rds
+        env: qa
+
+  - stage: deploy_qa_s3
+    dependsOn: [code_scan_iac_qa, linters]
+    displayName: Deploy qa S3
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-qa-s3-stack
+        resource: s3
+        library: aws881126-Control-Parental
+        account: Control-Parental-cuenta-implementacion-qa-aws
+        jobname: s3
+        env: qa
+
+
+  - stage: code_scan_iac_pdn
+    dependsOn: [deploy_qa_rds, deploy_qa_dms, deploy_qa_s3]
+    displayName: Code Scan IaC PDN
+    variables:
+      - group: 'aws881126-Control-Parental-DMS-pdn-ou-aws'
+      - name: env
+        value: 'pdn'
+    jobs:
+    - template: validations.yaml@Template_Control-Parental_rules
+      parameters:
+        resources: ['rds', 's3']
+
+  - stage: deploy_pdn_rds
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'],'refs/heads/trunk'))
+    dependsOn: [code_scan_iac_pdn, linters]
+    displayName: Deploy pdn RDS
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-pdn-rds-stack
+        resource: rds
+        library: aws881126-Control-Parental-DMS-pdn-ou-aws
+        account: Control-Parental-cuenta-implementacion-pdn-aws
+        jobname: rds
+        env: pdn
+
+  - stage: deploy_pdn_s3
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'],'refs/heads/trunk'))
+    dependsOn: [code_scan_iac_pdn, linters]
+    displayName: Deploy pdn S3
+    jobs:
+    - template: /Deployment/deployment.yaml@Cloud_aw881126_despliegu
+      parameters:
+        getEKSInfo: false
+        name: $(application-code)-$(project-name)-pdn-s3-stack
+        resource: s3
+        library: aws881126-Control-Parental-DMS-pdn-ou-aws
+        account: Control-Parental-cuenta-implementacion-pdn-aws
+        jobname: s3
+        env: pdngit 

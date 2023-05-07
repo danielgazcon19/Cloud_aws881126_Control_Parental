@@ -1,0 +1,370 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: This template deploy all required S3 buckets for this app, files, certificates and load balancer logs
+
+Parameters:
+  pAppBucketName:
+    Description: S3 bucket name which contain app files and public certificates.
+    Type: String  
+  
+  pkmsproject:
+    Description: Llave de cifrado del proyecto
+    Type: String  
+
+  pImportBase:
+    Description: Cadena de proyecto para Parameter storage
+    Type: String
+
+  pEnvironment:
+    Description: Ambiente donde se despliega.
+    Type: String
+    
+  pAccessControl:
+    Description: Specify the access control list.
+    Type: String
+
+  BucketsftpARN:
+    Description: bucket para el sftp
+    Type: String
+
+  SFTPRol:
+    Description: ARN Del rol para sftp
+    Type: String
+
+  KMSADKey:
+    Description: ARN KMS AD Key
+    Type: String
+    NoEcho: true
+
+  pSecretManagerADPasswARN:
+    Description: ARN Secret
+    Type: String
+    Default: "secret"
+    NoEcho: true
+
+Conditions:
+
+  s3Exist:
+    !Not [!Equals [!Ref pAccessControl,"false"]]
+
+  cSoloSiEs:
+    Fn::Or:
+      - Fn::Equals: [Ref: pEnvironment, qa]
+      - Fn::Equals: [Ref: pEnvironment, pdn]
+
+Resources:
+  rS3RDS:
+    Condition: s3Exist
+    Type: AWS::S3::Bucket    
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      AccessControl: Private
+      LifecycleConfiguration:
+        Rules:
+          - Id: GlacierRule
+            Prefix: glacier
+            Status: Enabled
+            ExpirationInDays: 3650
+            Transitions:
+              - TransitionInDays: 1
+                StorageClass: GLACIER
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref KMSADKey
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketName: !Ref pAppBucketName
+      Tags:
+        - Key: "Control-Parental:clasificacion-integridad"
+          Value: "impacto tolerable"
+        - Key: "Control-Parental:clasificacion-disponibilidad"
+          Value: "impacto tolerable"
+        - Key: "Control-Parental:dominio-informacion"
+          Value: "no"
+        - Key: "Control-Parental:datos-personales"
+          Value: "no"
+        - Key: "Control-Parental:cumplimiento"
+          Value: "no"
+
+  BucketPolicyIndex:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: rS3RDS
+      PolicyDocument:
+        Statement:
+          - Sid: "BucketPolicyForTransferFamily1"
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:ListBucket
+              - s3:GetObjectVersion
+              - s3:GetObjectACL
+              - s3:PutObjectACL
+              - s3:DeleteObjectVersion
+              - s3:DeleteObject
+            Effect: Allow
+            Resource:
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, ]]
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, /*]]
+            Condition:
+              Bool:
+                aws:SecureTransport: 'true'  
+            Effect: Deny
+            Principal: "*"
+            Action:
+              - s3:*
+            Resource:
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, ]]
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, /*]]
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: "BucketPolicyForTransferFamily2"
+            Action:
+              - s3:GetBucketLocation
+            Effect: Allow
+            Resource:
+              - !GetAtt  rS3RDS.Arn
+            Principal:
+              AWS:
+                - !Ref SFTPRol
+
+  rDMSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: 'role-RDS'
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/Governance-control
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - dms.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      MaxSessionDuration: 3600
+
+  s3Policy:
+    Type: AWS::IAM::Policy
+    DependsOn:
+      - rDMSRole
+    Properties:
+      PolicyName:
+        Fn::Join: ["-", [ Ref: pImportBase ] ]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Permisos dms
+          - Sid: AllowDMS
+            Effect: "Allow"
+            Action:
+              - 'dms:CreateEndpoint'
+              - 'dms:DeleteEndpoint'
+              - 'dms:ModifyEndpoint'
+              - 'dms:CreateReplicationTask'
+              - 'dms:DeleteReplicationTask'
+              - 'dms:StartReplicationTask'
+              - 'dms:StopReplicationTask'
+              - 'dms:DescribeEndpoints'
+              - 'dms:DescribeReplicationTasks'
+            Resource: "*"
+          - Sid: AllowRDS
+            Effect: "Allow"
+            Action:
+              - 'rds:DescribeDBInstances'
+              - 'rds:ListTagsForResource'
+              - 'rds:ModifyDBInstance'
+            Resource: "*"
+          # Permisos para IAM
+          - Sid: AllowIAM
+            Effect: Allow
+            Action:
+              - 'iam:GetRole'
+              - 'iam:PassRole'
+              - 'iam:CreateRole'
+              - 'iam:AttachRolePolicy'
+            Resource: "*"
+          # Permisos para crear la EC2
+          - Sid: AllowEC2
+            Effect: Allow
+            Action:
+              - 'ec2:DescribeVpcs'
+              - 'ec2:DescribeInternetGateways'
+              - 'ec2:DescribeAvailabilityZones'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeSecurityGroups'
+              - 'ec2:ModifyNetworkInterfaceAttribute'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:DeleteNetworkInterface'
+            Resource: "*"
+          #Permisos para revisar logs
+          - Sid: Allowlogs
+            Effect: Allow
+            Action:
+              - 'logs:DescribeLogGroups'
+              - 'logs:DescribeLogStreams'
+              - 'logs:FilterLogEvents'
+              - 'logs:GetLogEvents'
+            Resource: "*"
+          #Permisos para acceder a recurso S3
+          - Sid: AllowS3
+            Effect: "Allow"
+            Action: 
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:DeleteObjectVersion'
+              - 's3:DeleteObject'
+              - 's3:GetObjectVersion'
+              - 's3:GetObjectACL'
+              - 's3:PutObjectACL'
+              - 's3:PutObjectTagging'
+              - 's3:ListAllMyBuckets'
+            Resource:
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, ]]
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, /*]]
+          - Sid: AllowS3List
+            Effect: Allow
+            Action:
+              - 's3:ListBucket'
+            Resource:
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, ]]
+              - !Join ["", [ !GetAtt  rS3RDS.Arn, /*]]
+      Roles:
+        - !Ref rDMSRole
+
+  rEC2SecretPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: "ec2Secretos"
+      Roles:
+        - !Ref rDMSRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "secretsmanager:GetSecretValue"
+              - "secretsmanager:ListSecrets"
+            Resource:
+              - !Ref pSecretManagerADPasswARN
+
+  rCustomKMSPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: "ec2kms"
+      Roles:
+        - !Ref rDMSRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource:
+              - !Ref KMSADKey
+
+  rIAMManagedPolicyforS3BackupRestore:
+    DependsOn:
+    - rS3RDS
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: !Join ["", [!Ref 'AWS::StackName' , "-iam-managed-policy"]]         
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+         - 
+            Effect: Allow
+            Action:
+              - 's3:ListBucket'
+              - 's3:GetBucketLocation'
+            Resource:
+                Fn::Sub: arn:aws:s3:::${pAppBucketName}
+         - 
+            Effect: Allow            
+            Action:
+              - 's3:GetObjectMetaData'
+              - 's3:GetObject'
+              - 's3:PutObject'
+              - 's3:ListMultipartUploadParts'
+              - 's3:AbortMultipartUpload'
+            Resource:
+                  !Join ["", ["arn:aws:s3:::", !Ref pAppBucketName, "/*"]]
+                  
+      Roles:
+        - !Ref rIAMRoleForRDS
+
+  rIAMRoleforS3BackupRestore:
+    DependsOn:
+    - rS3RDS
+    Type: 'AWS::IAM::Role'
+    Properties:
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/Governance-control
+      RoleName: !Join ["", [!Ref 'AWS::StackName' , "-s3-backup-restore-role"]]
+      AssumeRolePolicyDocument:
+        Statement:
+         -  Effect: Allow
+            Principal:
+              Service:
+                - rds.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+       -  PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+             - 
+                Effect: Allow
+                Action:
+                  - 's3:GetObjectMetaData'
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                  - 's3:ListMultipartUploadParts'
+                  - 's3:AbortMultipartUpload'
+                Resource:
+                  - !Join ["", ["arn:aws:s3:::", !Ref pAppBucketName]]                
+          PolicyName: !Join ["", [!Ref 'AWS::StackName' , "-iam-s3-backup-restore-policy-role"]]         
+
+  rIAMRoleForRDS:
+    DependsOn:
+    - rS3RDS
+    Type: 'AWS::IAM::Role'
+    Properties:
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/Governance-control
+        Fn::Join: ["-", [Ref: 'AWS::StackName' , "role"]]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - rds.amazonaws.com
+                - monitoring.rds.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                  - 's3:ListBucket'
+                  - 's3:AbortMultipartUpload'
+                  - 's3:CreateMultipartUpload'
+                Resource:
+                #  Fn::Sub: arn:aws:s3:::${pImportBase}-s3-rds/*
+                  - Fn::Join: [ '', [ 'arn:aws:s3:::', !Ref 'pAppBucketName' ] ]
+                  - Fn::Join: [ '', [ 'arn:aws:s3:::', !Ref 'pAppBucketName', /* ] ]
+                Effect: Allow
+          PolicyName: 
+            Fn::Join: ["-", [Ref: 'AWS::StackName' , "iam-policy"]]

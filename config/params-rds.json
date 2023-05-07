@@ -1,0 +1,116 @@
+[
+    {
+        "ParameterKey": "pEnvironment",
+        "ParameterValue": "#{env}#"
+    },
+    {
+        "ParameterKey": "pDataBase",
+        "ParameterValue": "#{rds-data-base}#"
+    },
+
+    {
+        "ParameterKey": "psgDMS",
+        "ParameterValue": "#{dms-sg}#"
+    },
+    {
+        "ParameterKey": "pDBName",
+        "ParameterValue": "#{rds-db-name}#"
+    },
+    {
+        "ParameterKey": "pAllocatedStorage",
+        "ParameterValue": "#{rds-allocated-storage}#"
+    },
+    {
+        "ParameterKey": "pStorageType",
+        "ParameterValue": "#{rds-storage-type}#"
+    },
+    {
+        "ParameterKey": "pLicenseModel",
+        "ParameterValue": "#{rds-license-model}#"
+    },
+    {
+        "ParameterKey": "pSnapshotIdentifier",
+        "ParameterValue": "#{rds-snapshot-identifier}#"
+    },
+    {
+        "ParameterKey": "pImportBase",
+        "ParameterValue": "#{application-code}#-#{project-name}#-#{env}#"
+    },
+    {
+        "ParameterKey": "pCharacterSetName",
+        "ParameterValue": "#{rds-character-set}#"
+    },
+    {
+        "ParameterKey": "pMaxAllocatedStorage",
+        "ParameterValue": "#{rds-max-allocated-storage}#"
+    },
+
+    {
+        "ParameterKey": "pRdspAppBucketName",
+        "ParameterValue": "#{s3-bucket}#"
+    },
+    {
+        "ParameterKey": "pSGTrasnversal",
+        "ParameterValue": "#{rds-sg-trasnversal}#"
+    },
+    {
+        "ParameterKey": "pRdsclassintance",
+        "ParameterValue": "#{rds-instance-class}#"
+    },
+    {
+        "ParameterKey": "pEngineVersion",
+        "ParameterValue": "#{rds-engine-version}#"
+    },
+    {
+        "ParameterKey": "pIopsAprovicionados",
+        "ParameterValue": "#{rds-Iops-Aprovicionados}#"
+    },
+    {
+        "ParameterKey": "pLogGroupName",
+        "ParameterValue": "#{log-group-name}#"
+    },
+    {
+        "ParameterKey": "pFilters",
+        "ParameterValue": "#{rds-filters}#"
+    },
+    {
+        "ParameterKey": "instanceScheduler",
+        "ParameterValue": "#{instance-scheduler}#"
+    },
+    {
+        "ParameterKey": "pkmsproject",
+        "ParameterValue": "#{arn-project-dms}#"
+    },
+    {
+        "ParameterKey": "pPSSGEC2",
+        "ParameterValue": "#{rds-sg-app}#"
+    },    
+    {
+        "ParameterKey": "pDBPortFROM",
+        "ParameterValue": "#{dms-PortFROM-db-Onp}#"
+    },    
+    {
+        "ParameterKey": "pDBPortTO",
+        "ParameterValue": "#{dms-pDBPortTO-db-Onp}#"
+    },    
+    {
+        "ParameterKey": "pCidrIp",
+        "ParameterValue": "#{dms-CidrIp}#"
+    },    
+    {
+        "ParameterKey": "pDBDMSIp",
+        "ParameterValue": "#{dms-ip}#"
+    },
+    {
+        "ParameterKey": "KMSADKey",
+        "ParameterValue": "#{arn-kms-ad}#"
+    },
+    {
+        "ParameterKey": "KMSpdn",
+        "ParameterValue": "#{cod-kms-pdn}#"
+    },
+    {
+        "ParameterKey": "KMSshared",
+        "ParameterValue": "#{cod-kms-shared}#"
+    }
+]

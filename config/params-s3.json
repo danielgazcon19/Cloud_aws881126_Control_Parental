@@ -1,0 +1,38 @@
+[
+  {
+    "ParameterKey": "pAppBucketName",
+    "ParameterValue": "#{s3-bucket}#"
+  },
+  {
+    "ParameterKey": "pImportBase",
+    "ParameterValue": "#{application-code}#-#{project-name}#-#{env}#"
+  },
+  {
+    "ParameterKey": "pkmsproject",
+    "ParameterValue": "#{arn-project-dms}#"
+  },
+    {
+    "ParameterKey": "pEnvironment",
+    "ParameterValue": "#{env}#"
+  },
+  {
+    "ParameterKey": "pAccessControl",
+    "ParameterValue": "#{s3-access-control}#"
+  },
+  {
+    "ParameterKey": "pSecretManagerADPasswARN",
+    "ParameterValue": "#{arn-secretmamager-ad-passwd}#"
+},
+{
+    "ParameterKey": "KMSADKey",
+    "ParameterValue": "#{arn-kms-ad}#"
+},
+{
+  "ParameterKey": "SFTPRol",
+  "ParameterValue": "#{sftp-rol-bucket}#"
+},
+{
+  "ParameterKey": "BucketsftpARN",
+  "ParameterValue": "#{sftp-bucket-arn}#"
+}
+]
